@@ -69,3 +69,26 @@ def create_employee_account(data):
         "message": f"{employee_type} account created successfully",
         "employee_id": employee.employee_id
     }, 201
+
+def get_employees_by_type(employee_type=None):
+    query = Employee.query
+
+    if employee_type:
+        query = query.filter_by(employee_type=employee_type)
+
+    employees = query.all()
+
+    result = []
+
+    for e in employees:
+        result.append({
+            "employee_id": e.employee_id,
+            "fname": e.fname,
+            "lname": e.lname,
+            "full_name": f"{e.fname} {e.lname}",
+            "email": e.email,
+            "specialization": e.specialization,
+            "employee_type": e.employee_type
+        })
+
+    return result, 200

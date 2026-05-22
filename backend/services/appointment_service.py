@@ -42,3 +42,27 @@ def get_all_appointments():
         "count": len(result),
         "appointments": result
     }, 200
+
+
+def update_appointment_status(appointment_id, data):
+    status = data.get("appointment_status")
+
+    if status not in ["scheduled", "cancelled"]:
+        return {"error": "appointment_status must be scheduled or cancelled"}, 400
+
+    appointment = Appointment.query.get(appointment_id)
+
+    if not appointment:
+        return {"error": "Appointment not found"}, 404
+
+    if appointment.appointment_status != "pending":
+        return {"error": "Appointment has already been decided"}, 400
+
+    appointment.appointment_status = status
+    db.session.commit()
+
+    return {
+        "message": "Appointment status updated successfully",
+        "appointment_id": appointment.appointment_id,
+        "appointment_status": appointment.appointment_status,
+    }, 200

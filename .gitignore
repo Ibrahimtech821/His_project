@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Pipenv
+# Keep Pipfile and Pipfile.lock
+
+# Environment variables
+.env
+
+# Flask
+instance/
+*.log
+
+# React / Node
+frontend/node_modules/
+frontend/dist/
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db

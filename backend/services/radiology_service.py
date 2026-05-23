@@ -1,6 +1,7 @@
+from flask import request
 from extension import db
 from datetime import datetime
-from models import ScanRequest,ExamOrder,Image,Report,Appointment,Employee,Room,ScanType
+from models import ScanRequest,ExamOrder,Image,Report,Appointment,Employee,Room,ScanType,Radiologist
 from sqlalchemy import or_
 
 BACKEND_ORIGIN = "http://127.0.0.1:5000"
@@ -91,6 +92,7 @@ def schedule_exam_order(data):
         "request_id",
         "room_id",
         "technician_id",
+        "radiologist_id",
         "scheduled_datetime",
         "scheduled_by_admin_id"
     ]
@@ -118,6 +120,10 @@ def schedule_exam_order(data):
     if existing_exam:
         return {"error": "This scan request already has an exam order"}, 409
 
+    assigned_radiologist = Radiologist.query.get(data["radiologist_id"])
+    if not assigned_radiologist:
+        return {"error": "Radiologist not found"}, 404
+
     time_conflict = ExamOrder.query.filter_by(
         scheduled_datetime=scheduled_datetime,
         room_id=data["room_id"],
@@ -131,6 +137,7 @@ def schedule_exam_order(data):
         request_id=data["request_id"],
         room_id=data["room_id"],
         technician_id=data["technician_id"],
+        radiologist_id=data["radiologist_id"],
         scheduled_datetime=scheduled_datetime,
         scheduled_by_admin_id=data["scheduled_by_admin_id"],
         patient_confirmation_status="pending",
@@ -215,6 +222,14 @@ def create_report(data):
     if not requested_status:
         return {"error": "report_status must be completed or notcompleted"}, 400
 
+    exam_order = ExamOrder.query.get(data["exam_id"])
+    if not exam_order:
+        return {"error": "Exam order not found"}, 404
+
+    radiologist_id = data.get("radiologist_id")
+    if str(radiologist_id) != str(exam_order.radiologist_id):
+        return {"error": "This exam is assigned to a different radiologist"}, 403
+
     existing_report = Report.query.filter_by(exam_id=data["exam_id"]).first()
     report_id = None
     action_message = "Report created successfully"
@@ -222,7 +237,7 @@ def create_report(data):
     if existing_report:
         # Allow updating a draft/not-completed report to completed.
         if existing_report.report_status in ["notcompleted", "not completed"]:
-            existing_report.radiologist_id = data["radiologist_id"]
+            existing_report.radiologist_id = exam_order.radiologist_id
             existing_report.findings = data.get("findings")
             existing_report.impression = data.get("impression")
             existing_report.recommendation = data.get("recommendation")
@@ -235,7 +250,7 @@ def create_report(data):
     else:
         report = Report(
             exam_id=data["exam_id"],
-            radiologist_id=data["radiologist_id"],
+            radiologist_id=exam_order.radiologist_id,
             findings=data.get("findings"),
             impression=data.get("impression"),
             recommendation=data.get("recommendation"),
@@ -246,7 +261,6 @@ def create_report(data):
         db.session.flush()
         report_id = report.report_id
 
-    exam_order = ExamOrder.query.get(data["exam_id"])
     if exam_order and requested_status == "completed":
         exam_order.status = "completed"
 
@@ -436,6 +450,8 @@ def get_scan_types():
 
 def get_completed_exams():
     # Exams ready for radiologist: status is notcompleted and they have uploaded images.
+    radiologist_id = request.args.get("radiologist_id", type=int)
+
     query = (
         db.session.query(ExamOrder)
         .join(Image, ExamOrder.exam_id == Image.exam_id)
@@ -443,6 +459,9 @@ def get_completed_exams():
     )
 
     query = query.filter(ExamOrder.status == "notcompleted")
+
+    if radiologist_id:
+        query = query.filter(ExamOrder.radiologist_id == radiologist_id)
 
     exams = query.filter(
         or_(
@@ -457,11 +476,14 @@ def get_completed_exams():
         image_paths = [img.image_path for img in images]
         image_urls = [path if path.startswith("http") else f"{BACKEND_ORIGIN}{path}" for path in image_paths]
         tech = Employee.query.get(e.technician_id)
+        assigned_radiologist = Employee.query.get(e.radiologist_id)
         result.append({
             "exam_id": e.exam_id,
             "request_id": e.request_id,
             "room_id": e.room_id,
             "technician_id": f"{tech.fname} {tech.lname}" if tech else e.technician_id,
+            "radiologist_id": e.radiologist_id,
+            "radiologist_name": f"{assigned_radiologist.fname} {assigned_radiologist.lname}" if assigned_radiologist else e.radiologist_id,
             "scheduled_datetime": str(e.scheduled_datetime),
             "patient_confirmation_status": e.patient_confirmation_status,
             "images": image_paths,

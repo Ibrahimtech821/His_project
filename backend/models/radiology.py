@@ -43,6 +43,7 @@ class ExamOrder(db.Model):
     request_id = db.Column(db.Integer, db.ForeignKey("scan_request.request_id"), unique=True, nullable=False)
     room_id = db.Column(db.Integer, db.ForeignKey("room.room_id"), nullable=False)
     technician_id = db.Column(db.Integer, db.ForeignKey("technician.employee_id"), nullable=False)
+    radiologist_id = db.Column(db.Integer, db.ForeignKey("radiologist.employee_id"), nullable=False)
     scheduled_datetime = db.Column(db.DateTime, nullable=False)
     patient_confirmation_status = db.Column(
         db.Enum("pending", "confirmed", "declined"),
@@ -54,6 +55,7 @@ class ExamOrder(db.Model):
     request = db.relationship("ScanRequest")
     room = db.relationship("Room")
     technician = db.relationship("Technician")
+    radiologist = db.relationship("Radiologist")
     scheduled_by_admin = db.relationship("Admin")
 
 

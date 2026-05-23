@@ -21,14 +21,14 @@ export default function CreateReport() {
   const [completedExams, setCompletedExams] = useState([]);
 
   const loadCompletedExams = () => {
-    getCompletedExams()
+    getCompletedExams(user?.employee_id)
       .then((res) => setCompletedExams(Array.isArray(res.data) ? res.data : []))
       .catch(() => setCompletedExams([]));
   };
 
   useEffect(() => {
     loadCompletedExams();
-  }, []);
+  }, [user?.employee_id]);
 
   const change = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 

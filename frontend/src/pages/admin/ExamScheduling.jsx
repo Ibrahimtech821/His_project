@@ -8,6 +8,7 @@ import {
   getScanRequests,
   getTechnicians,
   getRooms,
+  getRadiologists,
 } from "../../services/api";
 
 export default function ExamScheduling() {
@@ -16,11 +17,13 @@ export default function ExamScheduling() {
   const [acceptedRequests, setAcceptedRequests] = useState([]);
   const [technicians, setTechnicians] = useState([]);
   const [rooms, setRooms] = useState([]);
+  const [radiologists, setRadiologists] = useState([]);
 
   const [form, setForm] = useState({
     request_id: "",
     room_id: "",
     technician_id: "",
+    radiologist_id: "",
     scheduled_datetime: "",
   });
 
@@ -28,15 +31,17 @@ export default function ExamScheduling() {
 
   const load = async () => {
     try {
-      const [reqRes, techRes, roomRes] = await Promise.all([
+      const [reqRes, techRes, roomRes, radiologistRes] = await Promise.all([
         getScanRequests("accepted"),
         getTechnicians(),
         getRooms(),
+        getRadiologists(),
       ]);
 
       setAcceptedRequests(Array.isArray(reqRes.data) ? reqRes.data : []);
       setTechnicians(Array.isArray(techRes.data) ? techRes.data : []);
       setRooms(Array.isArray(roomRes.data) ? roomRes.data : []);
+      setRadiologists(Array.isArray(radiologistRes.data) ? radiologistRes.data : []);
     } catch {
       setStatus({
         message: "Could not load scheduling data.",
@@ -74,6 +79,7 @@ export default function ExamScheduling() {
         request_id: "",
         room_id: "",
         technician_id: "",
+        radiologist_id: "",
         scheduled_datetime: "",
       });
 
@@ -140,6 +146,21 @@ export default function ExamScheduling() {
               <option key={tech.employee_id} value={tech.employee_id}>
                 {tech.full_name || `${tech.fname} ${tech.lname}`} —{" "}
                 {tech.specialization}
+              </option>
+            ))}
+          </select>
+
+          <select
+            name="radiologist_id"
+            value={form.radiologist_id}
+            onChange={change}
+            required
+          >
+            <option value="">Assign radiologist</option>
+
+            {radiologists.map((radiologist) => (
+              <option key={radiologist.employee_id} value={radiologist.employee_id}>
+                {radiologist.full_name || `${radiologist.fname} ${radiologist.lname}`} — {radiologist.specialization}
               </option>
             ))}
           </select>

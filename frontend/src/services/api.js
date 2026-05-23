@@ -57,5 +57,10 @@ export const getRooms = () => api.get("/radiology/rooms");
 export const createRoom = (data) => api.post("/radiology/rooms", data);
 export const createScanType = (data) => api.post("/radiology/scan-types", data);
 export const getScanTypes = () => api.get("/radiology/scan-types");
-export const getCompletedExams = () => api.get("/radiology/exam-orders/completed");
+export const getCompletedExams = (radiologist_id = "") =>
+  api.get(
+    radiologist_id
+      ? `/radiology/exam-orders/completed?radiologist_id=${radiologist_id}`
+      : "/radiology/exam-orders/completed"
+  );
 export default api;

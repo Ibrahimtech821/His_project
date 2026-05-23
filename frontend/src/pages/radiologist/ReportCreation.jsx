@@ -6,7 +6,6 @@ import Status from "../../components/Status";
 export default function ReportCreation() {
   const [form, setForm] = useState({
     exam_id: "",
-    radiologist_id: "",
     findings: "",
     impression: "",
     recommendation: "",
@@ -32,7 +31,6 @@ export default function ReportCreation() {
     <Card title="Create Radiology Report" subtitle="Add findings, impression, recommendation, date, and status">
       <form className="form" onSubmit={submit}>
         <input name="exam_id" placeholder="Exam ID" value={form.exam_id} onChange={change} required />
-        <input name="radiologist_id" placeholder="Radiologist ID" value={form.radiologist_id} onChange={change} required />
         <input name="report_date" type="date" value={form.report_date} onChange={change} />
         <select name="report_status" value={form.report_status} onChange={change}>
           <option value="draft">Draft</option>

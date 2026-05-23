@@ -75,7 +75,6 @@ class Report(db.Model):
 
     report_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     exam_id = db.Column(db.Integer, db.ForeignKey("exam_order.exam_id"), unique=True, nullable=False)
-    radiologist_id = db.Column(db.Integer, db.ForeignKey("radiologist.employee_id"), nullable=False)
     findings = db.Column(db.String(255))
     impression = db.Column(db.String(255))
     recommendation = db.Column(db.String(255))
@@ -83,4 +82,3 @@ class Report(db.Model):
     report_status = db.Column(db.String(30), default="notcompleted")
 
     exam = db.relationship("ExamOrder")
-    radiologist = db.relationship("Radiologist")

@@ -23,7 +23,10 @@ export default function ReportCreation() {
       await createRadiologyReport(form);
       setStatus({ message: "Radiology report created successfully.", type: "success" });
     } catch (error) {
-      setStatus({ message: error.response?.data?.message || "Failed to create report.", type: "error" });
+      setStatus({
+        message: error.response?.data?.error || error.response?.data?.message || "Failed to create report.",
+        type: "error",
+      });
     }
   };
 

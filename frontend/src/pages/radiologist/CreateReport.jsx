@@ -40,14 +40,16 @@ export default function CreateReport() {
     try {
       await createRadiologyReport({
         ...form,
-        radiologist_id: user.employee_id,
       });
 
       setStatus({ message: "Radiology report created successfully.", type: "success" });
       setForm({ exam_id: "", findings: "", impression: "", recommendation: "", report_date: "", report_status: "completed" });
       loadCompletedExams();
     } catch (error) {
-      setStatus({ message: error.response?.data?.error || "Failed to create report.", type: "error" });
+      setStatus({
+        message: error.response?.data?.error || error.response?.data?.message || "Failed to create report.",
+        type: "error",
+      });
     }
   };
 

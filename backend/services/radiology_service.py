@@ -1,6 +1,6 @@
 from flask import request
 from extension import db
-from datetime import datetime
+from datetime import datetime, date
 from models import ScanRequest,ExamOrder,Image,Report,Appointment,Employee,Room,ScanType,Radiologist
 from sqlalchemy import or_
 
@@ -8,8 +8,10 @@ BACKEND_ORIGIN = "http://127.0.0.1:5000"
 
 
 def _normalize_report_status(raw_status):
-    if raw_status in ["completed", "notcompleted", "not completed"]:
-        return "notcompleted" if raw_status == "not completed" else raw_status
+    if raw_status in ["completed", "final"]:
+        return "completed"
+    if raw_status in ["notcompleted", "not completed", "draft"]:
+        return "notcompleted"
     return None
 
 
@@ -19,6 +21,21 @@ def _parse_datetime(value):
     if isinstance(value, str):
         try:
             return datetime.fromisoformat(value)
+        except ValueError:
+            return None
+    return None
+
+
+def _parse_date(value):
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, str):
+        if not value.strip():
+            return None
+        try:
+            return date.fromisoformat(value)
         except ValueError:
             return None
     return None
@@ -212,7 +229,7 @@ def upload_image(data):
 
 
 def create_report(data):
-    required = ["exam_id", "radiologist_id"]
+    required = ["exam_id"]
 
     for field in required:
         if not data.get(field):
@@ -220,15 +237,15 @@ def create_report(data):
 
     requested_status = _normalize_report_status(data.get("report_status", "completed"))
     if not requested_status:
-        return {"error": "report_status must be completed or notcompleted"}, 400
+        return {"error": "report_status must be completed, notcompleted, draft, or final"}, 400
 
     exam_order = ExamOrder.query.get(data["exam_id"])
     if not exam_order:
         return {"error": "Exam order not found"}, 404
 
-    radiologist_id = data.get("radiologist_id")
-    if str(radiologist_id) != str(exam_order.radiologist_id):
-        return {"error": "This exam is assigned to a different radiologist"}, 403
+    report_date = _parse_date(data.get("report_date"))
+    if data.get("report_date") and report_date is None:
+        return {"error": "Invalid report_date format"}, 400
 
     existing_report = Report.query.filter_by(exam_id=data["exam_id"]).first()
     report_id = None
@@ -237,11 +254,10 @@ def create_report(data):
     if existing_report:
         # Allow updating a draft/not-completed report to completed.
         if existing_report.report_status in ["notcompleted", "not completed"]:
-            existing_report.radiologist_id = exam_order.radiologist_id
             existing_report.findings = data.get("findings")
             existing_report.impression = data.get("impression")
             existing_report.recommendation = data.get("recommendation")
-            existing_report.report_date = data.get("report_date")
+            existing_report.report_date = report_date
             existing_report.report_status = requested_status
             report_id = existing_report.report_id
             action_message = "Report updated successfully"
@@ -250,11 +266,10 @@ def create_report(data):
     else:
         report = Report(
             exam_id=data["exam_id"],
-            radiologist_id=exam_order.radiologist_id,
             findings=data.get("findings"),
             impression=data.get("impression"),
             recommendation=data.get("recommendation"),
-            report_date=data.get("report_date"),
+            report_date=report_date,
             report_status=requested_status
         )
         db.session.add(report)
@@ -352,7 +367,6 @@ def get_reports():
         result.append({
             "report_id": r.report_id,
             "exam_id": r.exam_id,
-            "radiologist_id": r.radiologist_id,
             "findings": r.findings,
             "impression": r.impression,
             "recommendation": r.recommendation,

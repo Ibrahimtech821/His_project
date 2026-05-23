@@ -48,6 +48,7 @@ class ExamOrder(db.Model):
         db.Enum("pending", "confirmed", "declined"),
         default="pending"
     )
+    status = db.Column(db.Enum("completed", "notcompleted"), default="notcompleted")
     scheduled_by_admin_id = db.Column(db.Integer, db.ForeignKey("admin.admin_id"), nullable=False)
 
     request = db.relationship("ScanRequest")
@@ -77,7 +78,7 @@ class Report(db.Model):
     impression = db.Column(db.String(255))
     recommendation = db.Column(db.String(255))
     report_date = db.Column(db.Date)
-    report_status = db.Column(db.Enum("pending", "completed", "reviewed"), default="pending")
+    report_status = db.Column(db.String(30), default="notcompleted")
 
     exam = db.relationship("ExamOrder")
     radiologist = db.relationship("Radiologist")

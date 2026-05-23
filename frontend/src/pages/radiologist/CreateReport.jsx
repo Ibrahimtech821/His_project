@@ -20,13 +20,19 @@ export default function CreateReport() {
   const [status, setStatus] = useState({ message: "", type: "" });
   const [completedExams, setCompletedExams] = useState([]);
 
-  useEffect(() => {
+  const loadCompletedExams = () => {
     getCompletedExams()
       .then((res) => setCompletedExams(Array.isArray(res.data) ? res.data : []))
       .catch(() => setCompletedExams([]));
+  };
+
+  useEffect(() => {
+    loadCompletedExams();
   }, []);
 
   const change = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const selectedExam = completedExams.find((exam) => String(exam.exam_id) === String(form.exam_id));
 
   const submit = async (e) => {
     e.preventDefault();
@@ -39,6 +45,7 @@ export default function CreateReport() {
 
       setStatus({ message: "Radiology report created successfully.", type: "success" });
       setForm({ exam_id: "", findings: "", impression: "", recommendation: "", report_date: "", report_status: "completed" });
+      loadCompletedExams();
     } catch (error) {
       setStatus({ message: error.response?.data?.error || "Failed to create report.", type: "error" });
     }
@@ -57,18 +64,29 @@ export default function CreateReport() {
         </select>
         <input name="report_date" type="date" value={form.report_date} onChange={change} />
 
-        <select name="report_status" value={form.report_status} onChange={change}>
-          <option value="pending">Pending</option>
-          <option value="completed">Completed</option>
-          <option value="reviewed">Reviewed</option>
-        </select>
-
         <textarea name="findings" placeholder="Findings" value={form.findings} onChange={change} />
         <textarea name="impression" placeholder="Impression" value={form.impression} onChange={change} />
         <textarea name="recommendation" placeholder="Recommendation" value={form.recommendation} onChange={change} />
 
         <button className="primary-btn full">Create Report</button>
       </form>
+
+      {selectedExam?.images?.length ? (
+        <div className="list" style={{ marginTop: 16 }}>
+          <strong>Scan Images for Exam #{selectedExam.exam_id}</strong>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginTop: 12 }}>
+            {(selectedExam.image_urls || []).map((src, index) => (
+              <a key={`${src}-${index}`} href={src} target="_blank" rel="noreferrer" style={{ display: "block" }}>
+                <img
+                  src={src}
+                  alt={`Exam ${selectedExam.exam_id} scan ${index + 1}`}
+                  style={{ width: "100%", height: 220, objectFit: "cover", borderRadius: 12 }}
+                />
+              </a>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <StatusMessage status={status} />
     </Card>

@@ -1,5 +1,26 @@
 from extension import db
+from datetime import datetime
 from models import ScanRequest,ExamOrder,Image,Report,Appointment,Employee,Room,ScanType
+from sqlalchemy import or_
+
+BACKEND_ORIGIN = "http://127.0.0.1:5000"
+
+
+def _normalize_report_status(raw_status):
+    if raw_status in ["completed", "notcompleted", "not completed"]:
+        return "notcompleted" if raw_status == "not completed" else raw_status
+    return None
+
+
+def _parse_datetime(value):
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            return None
+    return None
 
 
 def create_scan_request(data):
@@ -16,6 +37,10 @@ def create_scan_request(data):
 
     if appointment.appointment_status != "scheduled":
         return {"error": "Scan request can only be created for accepted appointments"}, 400
+
+    existing_request = ScanRequest.query.filter_by(appointment_id=data["appointment_id"]).first()
+    if existing_request:
+        return {"error": "A scan request already exists for this appointment"}, 409
 
     scan_request = ScanRequest(
         appointment_id=data["appointment_id"],
@@ -82,6 +107,10 @@ def schedule_exam_order(data):
     if scan_request.request_status != "accepted":
         return {"error": "Scan request must be accepted before scheduling"}, 400
 
+    scheduled_datetime = _parse_datetime(data["scheduled_datetime"])
+    if not scheduled_datetime:
+        return {"error": "Invalid scheduled_datetime format"}, 400
+
     existing_exam = ExamOrder.query.filter_by(
         request_id=data["request_id"]
     ).first()
@@ -89,13 +118,23 @@ def schedule_exam_order(data):
     if existing_exam:
         return {"error": "This scan request already has an exam order"}, 409
 
+    time_conflict = ExamOrder.query.filter_by(
+        scheduled_datetime=scheduled_datetime,
+        room_id=data["room_id"],
+        technician_id=data["technician_id"]
+    ).first()
+
+    if time_conflict:
+        return {"error": "This room or technician is already booked at the selected time"}, 409
+
     exam_order = ExamOrder(
         request_id=data["request_id"],
         room_id=data["room_id"],
         technician_id=data["technician_id"],
-        scheduled_datetime=data["scheduled_datetime"],
+        scheduled_datetime=scheduled_datetime,
         scheduled_by_admin_id=data["scheduled_by_admin_id"],
-        patient_confirmation_status="pending"
+        patient_confirmation_status="pending",
+        status="notcompleted"
     )
 
     db.session.add(exam_order)
@@ -154,6 +193,7 @@ def upload_image(data):
     )
 
     db.session.add(image)
+
     db.session.commit()
 
     return {
@@ -171,29 +211,50 @@ def create_report(data):
         if not data.get(field):
             return {"error": f"{field} is required"}, 400
 
-    existing_report = Report.query.filter_by(
-        exam_id=data["exam_id"]
-    ).first()
+    requested_status = _normalize_report_status(data.get("report_status", "completed"))
+    if not requested_status:
+        return {"error": "report_status must be completed or notcompleted"}, 400
+
+    existing_report = Report.query.filter_by(exam_id=data["exam_id"]).first()
+    report_id = None
+    action_message = "Report created successfully"
 
     if existing_report:
-        return {"error": "This exam already has a report"}, 409
+        # Allow updating a draft/not-completed report to completed.
+        if existing_report.report_status in ["notcompleted", "not completed"]:
+            existing_report.radiologist_id = data["radiologist_id"]
+            existing_report.findings = data.get("findings")
+            existing_report.impression = data.get("impression")
+            existing_report.recommendation = data.get("recommendation")
+            existing_report.report_date = data.get("report_date")
+            existing_report.report_status = requested_status
+            report_id = existing_report.report_id
+            action_message = "Report updated successfully"
+        else:
+            return {"error": "This exam already has a completed report"}, 409
+    else:
+        report = Report(
+            exam_id=data["exam_id"],
+            radiologist_id=data["radiologist_id"],
+            findings=data.get("findings"),
+            impression=data.get("impression"),
+            recommendation=data.get("recommendation"),
+            report_date=data.get("report_date"),
+            report_status=requested_status
+        )
+        db.session.add(report)
+        db.session.flush()
+        report_id = report.report_id
 
-    report = Report(
-        exam_id=data["exam_id"],
-        radiologist_id=data["radiologist_id"],
-        findings=data.get("findings"),
-        impression=data.get("impression"),
-        recommendation=data.get("recommendation"),
-        report_date=data.get("report_date"),
-        report_status=data.get("report_status", "completed")
-    )
+    exam_order = ExamOrder.query.get(data["exam_id"])
+    if exam_order and requested_status == "completed":
+        exam_order.status = "completed"
 
-    db.session.add(report)
     db.session.commit()
 
     return {
-        "message": "Report created successfully",
-        "report_id": report.report_id
+        "message": action_message,
+        "report_id": report_id
     }, 201
 
 
@@ -374,19 +435,27 @@ def get_scan_types():
 
 
 def get_completed_exams():
-    # Exams that have at least one uploaded image and do not yet have a report
-    exams = (
+    # Exams ready for radiologist: status is notcompleted and they have uploaded images.
+    query = (
         db.session.query(ExamOrder)
         .join(Image, ExamOrder.exam_id == Image.exam_id)
         .outerjoin(Report, ExamOrder.exam_id == Report.exam_id)
-        .filter(Report.exam_id == None)
-        .all()
     )
+
+    query = query.filter(ExamOrder.status == "notcompleted")
+
+    exams = query.filter(
+        or_(
+            Report.exam_id == None,
+            Report.report_status.in_(["notcompleted", "not completed"])
+        )
+    ).distinct().all()
 
     result = []
     for e in exams:
         images = Image.query.filter_by(exam_id=e.exam_id).all()
         image_paths = [img.image_path for img in images]
+        image_urls = [path if path.startswith("http") else f"{BACKEND_ORIGIN}{path}" for path in image_paths]
         tech = Employee.query.get(e.technician_id)
         result.append({
             "exam_id": e.exam_id,
@@ -396,6 +465,7 @@ def get_completed_exams():
             "scheduled_datetime": str(e.scheduled_datetime),
             "patient_confirmation_status": e.patient_confirmation_status,
             "images": image_paths,
+            "image_urls": image_urls,
         })
 
     return result, 200

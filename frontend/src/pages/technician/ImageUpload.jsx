@@ -12,7 +12,7 @@ export default function ImageUpload() {
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState({ message: "", type: "" });
 
-  useEffect(() => {
+  const loadExams = () => {
     getTechnicianExamOrders(user.employee_id)
       .then((res) =>
         setExams(
@@ -22,6 +22,10 @@ export default function ImageUpload() {
         )
       )
       .catch(() => setExams([]));
+  };
+
+  useEffect(() => {
+    loadExams();
   }, []);
 
   const change = (e) => setForm({ ...form, [e.target.name]: e.target.value });
@@ -30,20 +34,22 @@ export default function ImageUpload() {
     e.preventDefault();
 
     try {
-      if (file) {
-        const fd = new FormData();
-        fd.append("image", file);
-        fd.append("exam_id", form.exam_id);
-        if (form.upload_date) fd.append("upload_date", form.upload_date);
-
-        await uploadRadiologyImageFile(fd);
-      } else {
-        // Fallback to existing path-based API
-        await uploadRadiologyImageFile(new FormData());
+      if (!file) {
+        setStatus({ message: "Please choose an image file.", type: "error" });
+        return;
       }
+
+      const fd = new FormData();
+      fd.append("image", file);
+      fd.append("exam_id", form.exam_id);
+      if (form.upload_date) fd.append("upload_date", form.upload_date);
+
+      await uploadRadiologyImageFile(fd);
+
       setStatus({ message: "Image record saved successfully.", type: "success" });
       setForm({ exam_id: "", image_path: "", upload_date: "" });
       setFile(null);
+      loadExams();
     } catch (error) {
       setStatus({ message: error.response?.data?.error || "Failed to save image record.", type: "error" });
     }
@@ -61,8 +67,7 @@ export default function ImageUpload() {
           ))}
         </select>
 
-        <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-        <input name="image_path" placeholder="Image path / file URL (optional)" value={form.image_path} onChange={change} />
+        <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] || null)} required />
         <input name="upload_date" type="date" value={form.upload_date} onChange={change} />
 
         <button className="primary-btn full">Save Image</button>

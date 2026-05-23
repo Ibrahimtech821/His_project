@@ -103,10 +103,6 @@ export default function AppLayout() {
             <p>{role?.toUpperCase()} WORKSPACE</p>
             <h1>Hospital Radiology Information System</h1>
           </div>
-          <div className="topbar-card">
-            <span>API</span>
-            <strong>127.0.0.1:5000</strong>
-          </div>
         </header>
         <Outlet />
       </main>

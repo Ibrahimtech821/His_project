@@ -13,7 +13,8 @@ export default function PatientExams() {
   const load = async () => {
     try {
       const res = await getPatientExamOrders(user.patient_id);
-      setExams(Array.isArray(res.data) ? res.data : []);
+      const list = Array.isArray(res.data) ? res.data : [];
+      setExams(list.filter((exam) => exam.patient_confirmation_status === "pending"));
     } catch {
       setStatus({ message: "Could not load scheduled exams.", type: "error" });
     }
@@ -26,15 +27,15 @@ export default function PatientExams() {
   const respond = async (exam_id, responseStatus) => {
     try {
       await updateExamConfirmation(exam_id, responseStatus);
+      setExams((current) => current.filter((exam) => exam.exam_id !== exam_id));
       setStatus({ message: `Exam ${responseStatus} successfully.`, type: "success" });
-      load();
     } catch (error) {
       setStatus({ message: error.response?.data?.error || "Failed to update exam response.", type: "error" });
     }
   };
 
   return (
-    <Card title="Scheduled Radiology Exams" subtitle="Confirm or decline scheduled exam orders">
+    <Card title="Scheduled Radiology Exams" subtitle="Only pending exams are shown here">
       <div className="list">
         {exams.length === 0 ? (
           <EmptyState title="No scheduled exams" text="Scheduled exam orders will appear after admin scheduling." />

@@ -24,12 +24,12 @@ export default function AdminAppointments() {
 
   const changeStatus = async (appointment_id, appointment_status) => {
     try {
-      await updateAppointmentStatus(appointment_id, appointment_status);
+      const res = await updateAppointmentStatus(appointment_id, appointment_status);
       setAppointments((current) =>
         current.filter((appointment) => appointment.appointment_id !== appointment_id)
       );
       setStatus({
-        message: `Appointment #${appointment_id} ${appointment_status === "scheduled" ? "accepted" : "rejected"}.`,
+        message: res.data?.message || `Appointment #${appointment_id} updated.`,
         type: "success",
       });
     } catch (error) {
@@ -52,8 +52,8 @@ export default function AdminAppointments() {
             <div className="request-row" key={appointment.appointment_id}>
               <div>
                 <strong>Appointment #{appointment.appointment_id}</strong>
-                <span>Patient #{appointment.patient_id}</span>
-                <span>Physician #{appointment.physician_id}</span>
+                <span>Patient: {appointment.patient_name || `#${appointment.patient_id}`}</span>
+                <span>Doctor: {appointment.physician_name || `#${appointment.physician_id}`}</span>
                 <span>{appointment.appointment_datetime}</span>
               </div>
               <div className="button-group">

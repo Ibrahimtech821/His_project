@@ -1,5 +1,6 @@
 from flask import Blueprint, request
-from services.radiology_service import create_scan_request, accept_scan_request,schedule_exam_order,update_patient_confirmation,upload_image,create_report,get_scan_requests,get_patient_exam_orders,get_reports,get_technician_exam_orders,get_rooms,create_room,create_scan_type,get_scan_types
+from werkzeug.utils import secure_filename
+from services.radiology_service import create_scan_request, accept_scan_request,schedule_exam_order,update_patient_confirmation,upload_image,create_report,get_scan_requests,get_patient_exam_orders,get_reports,get_technician_exam_orders,get_rooms,create_room,create_scan_type,get_scan_types,get_completed_exams
 
 
 radiology_bp = Blueprint("radiology", __name__, url_prefix="/api/radiology")
@@ -53,7 +54,8 @@ def upload_image_file():
     uploads_dir = os.path.join("static", "uploads")
     os.makedirs(uploads_dir, exist_ok=True)
 
-    filename = f"exam_{exam_id}_{file.filename}"
+    safe_name = secure_filename(file.filename)
+    filename = f"exam_{exam_id}_{safe_name}"
     filepath = os.path.join(uploads_dir, filename)
     file.save(filepath)
 

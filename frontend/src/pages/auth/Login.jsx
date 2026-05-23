@@ -114,10 +114,13 @@ export default function Login() {
             New patient? <Link to="/register">Create account</Link>
           </p>
 
-          <div className="seed-note">
-            First admin example: <b>admin@his.com</b> / <b>admin123</b>
-          </div>
         </div>
+
+        {accountType === "employee" ? (
+          <div className="seed-note" style={{ marginTop: "1rem" }}>
+            Admin demo: <b>admin@his.com</b> / <b>admin123</b>
+          </div>
+        ) : null}
       </section>
     </main>
   );
